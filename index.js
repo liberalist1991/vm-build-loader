@@ -6,33 +6,45 @@ const VmHelper = require('./util/velocity.helper.js')
 
 let watcher;
 
-module.exports = function (content) {
+module.exports = function (source) {
     if (this.cacheable) {
         this.cacheable(true)
     }
     const callback = this.async();
     const options = loaderUtils.getOptions(this);
-    const filePath = this.resourcePath;
-    const fileName = path.basename(filePath).split('.')[0];
-    const fileDirPath = path.dirname(filePath);
-    const mockPath = path.join(fileDirPath, `../data/data-${fileName}.js`);
+
+    const vmPath = this.resourcePath;
+    const vmName = path.basename(vmPath, '.vm');
+
+    const vmDirPath = path.dirname(vmPath);
+    const srcPath = path.dirname(vmDirPath);
+
+    if (!/page$/.test(vmDirPath)) {
+        callback(null, source);
+        return
+    }
+
+    const vmDataPath = path.join(srcPath, `data-vm/data-${vmName}.js`);
+    const vmMetaPath = path.join(srcPath, `data-vm/data-${vmName}.vm`);
 
     watcher = this.addDependency
-    watcher(mockPath);
+    watcher(vmDataPath);
+    watcher(vmMetaPath);
 
     //清除require缓存
-    delete require.cache[mockPath]
-    const mock = require(mockPath);
+    delete require.cache[vmDataPath]
+    const vmData = require(vmDataPath);
 
+    const vmMeta = fs.readFileSync(vmMetaPath, 'utf8');
 
-    let contentAll = VmHelper.processParse(content, fileDirPath, filePath, 1);
+    let sourceAll = VmHelper.processParse(source, vmPath, srcPath, 1, watcher);
 
-    let result = '';
-    if (options.env === 'prod') {
-        result = contentAll;
-    } else {
-        result = VmHelper.render(contentAll, mock);
-    }
+    let tmpSourceAll = sourceAll.split('<body');
+
+    sourceAll = `${tmpSourceAll[0]}${vmMeta}<body${tmpSourceAll[1]}`
+
+    let result = options.env === 'prod' ?
+        sourceAll : VmHelper.render(sourceAll, vmData);
 
     callback(null, result);
 }

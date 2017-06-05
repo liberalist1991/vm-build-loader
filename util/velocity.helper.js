@@ -29,31 +29,33 @@ function clearCode(code) {
 }
 
 
+// 解析vm模块依赖的js 写入依赖
+function parseVtlJs(curModule, vmPath) {
 
-function parseJs(curModule, parentModule, basePath) {
-    if (curModule && parentModule) {
-        var parentJs = _path.join(basePath, `${parentModule}.js`);
-        var parentVmContent = fs.readFileSync(parentJs, 'utf8');
+        var vmJs = vmPath.replace('.vm', '.js');
 
-        if (new RegExp(`${curModule}`).test(parentVmContent)) {
+        var vmJSCode = fs.readFileSync(vmJs, 'utf8');
+
+        if (new RegExp(`${curModule}`).test(vmJSCode)) {
             return;
         }
-        fs.writeFileSync(parentJs,
-            `${parentVmContent}
-            require('./${curModule}/${curModule}.scss')
-            require('./${curModule}/${curModule}.js')`,
+        fs.writeFileSync(vmJs,
+            `${vmJSCode}
+            require('../module/${curModule}/${curModule}.scss')
+            require('../module/${curModule}/${curModule}.js')`,
             'utf8');
-    }
+
 }
-function processParse(code, basePath, vmPath, zIndex) {
+
+function processParse(code, vmPath, srcPath, zIndex, watcher) {
     // clear
     code = clearCode(code);
 
     // parse
-    var parseReg = /[\n | ]+#parse\(.*\)/g;
-    var parseList = code.match(parseReg);
-    var parseStartReg = /^#parse\(.*\)/;
-    var parseStart = code.match(parseStartReg);
+    let parseReg = /[\n | ]+#parse\(.*\)/g;
+    let parseList = code.match(parseReg);
+    let parseStartReg = /^#parse\(.*\)/;
+    let parseStart = code.match(parseStartReg);
 
     if (parseStart) {
         parseList = parseList || [];
@@ -63,29 +65,36 @@ function processParse(code, basePath, vmPath, zIndex) {
     if (!parseList) {
         return code;
     }
-
     parseList.forEach(function (val, i) {
-        var pathReg = /['|"](.*)['|"]/;
-        var path = pathReg.exec(val)[1];
-        var parseCode = fs.readFileSync(_path.join(basePath, './', path), 'utf8');
+        let pathReg = /['|"](.*)['|"]/;
+        let curModule = pathReg.exec(val)[1];
 
+        let curModuleVtlPath;
         if (zIndex === 1) {
-            parseJs(_path.basename(path).split('.')[0],
-                _path.basename(vmPath).split('.')[0], basePath);
+            curModuleVtlPath = _path.join(srcPath,`module/${curModule}/${curModule}.vtl`);
+            parseVtlJs(curModule, vmPath);
+        } else {
+            curModuleVtlPath = _path.join(srcPath,`module/${curModule.replace(/^\//, '')}`);
+
         }
+        watcher(curModuleVtlPath)
+
+        let vtlCode = fs.readFileSync(curModuleVtlPath, 'utf8');
 
         var space = val.match(/ /g) || [];
         var space = space.join('');
 
         // 处理缩进
-        parseCode = clearCode(parseCode);
-        parseCode = parseCode.replace(/\n/g, '\n' + space);
-        parseCode = '\n\n' + space + parseCode + '\n\n';
+        vtlCode = clearCode(vtlCode);
+        vtlCode = vtlCode.replace(/\n/g, '\n' + space);
+        vtlCode = '\n\n' + space + vtlCode + '\n\n';
 
-        code = code.replace(val, parseCode);
+        code = code.replace(val, vtlCode);
     });
-    return processParse(code, basePath, vmPath, ++zIndex);
+
+    return processParse(code, vmPath, srcPath, ++zIndex, watcher);
 }
+
 
 var vmHelper = {
     clearCode: clearCode,
