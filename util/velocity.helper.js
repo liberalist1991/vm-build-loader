@@ -30,7 +30,7 @@ function clearCode(code) {
 
 
 // 解析vm模块依赖的js 写入依赖
-function parseVtlJs(curModule, vmPath) {
+function parseVtlJs(curModule, vmPath, relativePath) {
 
         var vmJs = vmPath.replace('.vm', '.js');
 
@@ -41,13 +41,14 @@ function parseVtlJs(curModule, vmPath) {
         }
         fs.writeFileSync(vmJs,
             `${vmJSCode}
-            require('../module/${curModule}/${curModule}.scss')
-            require('../module/${curModule}/${curModule}.js')`,
+            require('${relativePath.replace('.vtl', '.scss')}')
+            require('${relativePath.replace('.vtl', '.js')}')`,
             'utf8');
 
 }
 
-function processParse(code, vmPath, srcPath, zIndex, watcher) {
+// syncStatic：是否自动写入静态依赖
+function processParse(code, vmPath, syncStatic, watcher) {
     // clear
     code = clearCode(code);
 
@@ -70,12 +71,15 @@ function processParse(code, vmPath, srcPath, zIndex, watcher) {
         let curModule = pathReg.exec(val)[1];
 
         let curModuleVtlPath;
-        if (zIndex === 1) {
-            curModuleVtlPath = _path.join(srcPath,`module/${curModule}/${curModule}.vtl`);
-            parseVtlJs(curModule, vmPath);
-        } else {
-            curModuleVtlPath = _path.join(srcPath,`module/${curModule.replace(/^\//, '')}`);
 
+        // 通用写法
+        if (curModule.indexOf('/') > 0) {
+            curModuleVtlPath = _path.resolve(`src/module/${curModule.replace(/^\//, '')}`);
+        } else { //模块
+            curModuleVtlPath = _path.resolve(`src/module/${curModule}/${curModule}.vtl`);
+        }
+        if (!!syncStatic) {
+            parseVtlJs(curModule, vmPath, _path.relative(_path.dirname(vmPath), curModuleVtlPath));
         }
         watcher(curModuleVtlPath)
 
@@ -92,7 +96,7 @@ function processParse(code, vmPath, srcPath, zIndex, watcher) {
         code = code.replace(val, vtlCode);
     });
 
-    return processParse(code, vmPath, srcPath, ++zIndex, watcher);
+    return processParse(code, vmPath, false, watcher);
 }
 
 

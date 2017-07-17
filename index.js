@@ -7,25 +7,26 @@ const VmHelper = require('./util/velocity.helper.js')
 let watcher;
 
 module.exports = function (source) {
+
     if (this.cacheable) {
         this.cacheable(true)
     }
     const callback = this.async();
     const options = loaderUtils.getOptions(this);
-
+    // /src/page/somepage/page.vm
     const vmPath = this.resourcePath;
-    const vmName = path.basename(vmPath, '.vm');
+    // /src/page/somepage
+    const pagePath = path.dirname(vmPath);
+    // /somepage.vm
+    const pageName = path.basename(pagePath);
 
-    const vmDirPath = path.dirname(vmPath);
-    const srcPath = path.dirname(vmDirPath);
-
-    if (!/page$/.test(vmDirPath)) {
+    if (!/page/.test(pagePath)) {
         callback(null, source);
         return
     }
 
-    const vmDataPath = path.join(srcPath, `data-vm/data-${vmName}.js`);
-    const vmMetaPath = path.join(srcPath, `data-vm/data-${vmName}.vm`);
+    const vmDataPath = path.resolve(`src/data-vm/data-${pageName}.js`);
+    const vmMetaPath = path.join(`src/data-vm/data-${pageName}.vm`);
 
     watcher = this.addDependency
     watcher(vmDataPath);
@@ -37,14 +38,21 @@ module.exports = function (source) {
 
     const vmMeta = fs.readFileSync(vmMetaPath, 'utf8');
 
-    let sourceAll = VmHelper.processParse(source, vmPath, srcPath, 1, watcher);
+    let sourceAll = VmHelper.processParse(source, vmPath, options.syncStatic != false , watcher);
 
-    let tmpSourceAll = sourceAll.split('<body');
+    let tmpSourceAll = sourceAll.split('<html');
 
-    sourceAll = `${tmpSourceAll[0]}${vmMeta}<body${tmpSourceAll[1]}`
+    sourceAll = options.env === 'prod' ? `${tmpSourceAll[0]}${vmMeta}<html${tmpSourceAll[1]}`
+        : `${tmpSourceAll[0]}
+        <script>
+            console.log('直出数据：', ${JSON.stringify(vmData)})
+        </script>
+        ${vmMeta}<html${tmpSourceAll[1]}`;
 
     let result = options.env === 'prod' ?
-        sourceAll : VmHelper.render(sourceAll, vmData);
+        sourceAll : VmHelper.render(sourceAll, vmData, null, {
+            escape: false
+        });
 
     callback(null, result);
 }
