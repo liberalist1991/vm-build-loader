@@ -13,11 +13,14 @@ module.exports = function (source) {
     }
     const callback = this.async();
     const options = loaderUtils.getOptions(this);
+    if (!options.moduleTplSuffix) {
+        options.moduleTplSuffix = '.vtl'
+    }
     // /src/page/somepage/page.vm
     const vmPath = this.resourcePath;
     // /src/page/somepage
     const pagePath = path.dirname(vmPath);
-    // /somepage.vm
+    // /somepage
     const pageName = path.basename(pagePath);
 
     if (!/page/.test(pagePath)) {
@@ -25,8 +28,10 @@ module.exports = function (source) {
         return
     }
 
-    const vmDataPath = path.resolve(`src/data-vm/data-${pageName}.js`);
-    const vmMetaPath = path.join(`src/data-vm/data-${pageName}.vm`);
+    const vmDataPath = path.resolve(
+        `src/${options.vmDataDir || 'data-vm'}/data-${pageName}${options.vmDataSuffix || '.js'}`
+    );
+    const vmMetaPath = path.join(`src/${options.vmDataDir || 'data-vm'}/data-${pageName}.vm`);
 
     watcher = this.addDependency
     watcher(vmDataPath);
@@ -38,16 +43,18 @@ module.exports = function (source) {
 
     const vmMeta = fs.readFileSync(vmMetaPath, 'utf8');
 
-    let sourceAll = VmHelper.processParse(source, vmPath, options.syncStatic != false , watcher);
+    let sourceAll = VmHelper.processParse(source, vmPath, options.syncStatic != false, options,
+        watcher, {});
 
-    let tmpSourceAll = sourceAll.split('<html');
+    let splits = sourceAll.split(/\<\s*html\s*>/);
 
-    sourceAll = options.env === 'prod' ? `${tmpSourceAll[0]}${vmMeta}<html${tmpSourceAll[1]}`
-        : `${tmpSourceAll[0]}
+    sourceAll = options.env === 'prod' ? `${splits[0]}<html>${vmMeta}${splits[1]}` :
+        `${splits[0]}<html>${vmMeta}
         <script>
-            console.log('直出数据：', ${JSON.stringify(vmData)})
+            console.log('直出数据：', ${safeStr(JSON.stringify(vmData))})
         </script>
-        ${vmMeta}<html${tmpSourceAll[1]}`;
+        ${splits[1]}
+        `;
 
     let result = options.env === 'prod' ?
         sourceAll : VmHelper.render(sourceAll, vmData, null, {
@@ -55,4 +62,8 @@ module.exports = function (source) {
         });
 
     callback(null, result);
+}
+
+function safeStr(str) {
+    return str.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, "&#039;");
 }
