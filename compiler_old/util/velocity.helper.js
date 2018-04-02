@@ -45,7 +45,6 @@ function parseVtlJs(curModule, vmPath, relativePath, moduleFullName, curModule) 
 
 // syncStatic：是否自动写入静态依赖
 function processParse(code, vmPath, syncStatic, options, watcher, _modules) {
-
     // clear
     code = clearCode(code);
 
@@ -130,6 +129,7 @@ function processParse(code, vmPath, syncStatic, options, watcher, _modules) {
     });
 
     return processParse(code, vmPath, false, options, watcher, _modules);
+
 }
 
 

@@ -35,5 +35,4 @@ module.exports = function (source) {
     } else {
         callback(null, Parser_old(this, source));
     }
-
 }
