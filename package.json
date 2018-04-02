@@ -3,7 +3,7 @@
     "name": "liberalist"
   },
   "dependencies": {
-     "velocityjs":"^0.9.6",
+     "velocityjs":"^1.0.1",
      "loader-utils": "^1.1.0"
    },
   "description": "velocity/vm loader for webpack",
@@ -27,5 +27,5 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "version": "0.3.6"
+  "version": "0.4.0"
 }
